@@ -256,6 +256,8 @@ export type SpectrogramPluginOptions = {
   colorMap?: number[][]
   /** Render a spectrogram for each channel independently when true. */
   splitChannels?: boolean
+  /** Set to true to render the Y axis in logarithmic scale. */
+  logY?: boolean
 }
 
 export type SpectrogramPluginEvents = BasePluginEvents & {
@@ -304,6 +306,8 @@ class SpectrogramPlugin extends BasePlugin<SpectrogramPluginEvents, SpectrogramP
     // So set 12kHz default to render like wavesurfer.js 5.x.
     this.frequencyMin = options.frequencyMin || 0
     this.frequencyMax = options.frequencyMax || 0
+
+    this.logY = options.logY || false
 
     this.createWrapper()
     this.createCanvas()
@@ -424,6 +428,7 @@ class SpectrogramPlugin extends BasePlugin<SpectrogramPluginEvents, SpectrogramP
     const freqFrom = this.buffer.sampleRate / 2
     const freqMin = this.frequencyMin
     const freqMax = this.frequencyMax
+    const logY = this.logY
 
     if (!spectrCc) {
       return
@@ -434,14 +439,28 @@ class SpectrogramPlugin extends BasePlugin<SpectrogramPluginEvents, SpectrogramP
       const pixels = this.resample(frequenciesData[c])
       const imageData = new ImageData(width, height)
 
-      for (let i = 0; i < pixels.length; i++) {
-        for (let j = 0; j < pixels[i].length; j++) {
-          const colorMap = this.colorMap[pixels[i][j]]
-          const redIndex = ((height - j) * width + i) * 4
-          imageData.data[redIndex] = colorMap[0] * 255
-          imageData.data[redIndex + 1] = colorMap[1] * 255
-          imageData.data[redIndex + 2] = colorMap[2] * 255
-          imageData.data[redIndex + 3] = colorMap[3] * 255
+      if (!logY) {
+        for (let i = 0; i < pixels.length; i++) {
+          for (let j = 0; j < pixels[i].length; j++) {
+            const colorMap = this.colorMap[pixels[i][j]]
+            const redIndex = ((height - j) * width + i) * 4
+            imageData.data[redIndex] = colorMap[0] * 255
+            imageData.data[redIndex + 1] = colorMap[1] * 255
+            imageData.data[redIndex + 2] = colorMap[2] * 255
+            imageData.data[redIndex + 3] = colorMap[3] * 255
+          }
+        }
+      } else {
+        for (let i = 0; i < pixels.length; i++) {
+          for (let j = 0; j < pixels[i].length; j++) {
+            const colorMap = this.colorMap[pixels[i][j]]
+            const y = (Math.log10(j + 1) / Math.log10(pixels[i].length + 1)) * height
+            const redIndex = ((height - Math.round(y)) * width + i) * 4
+            imageData.data[redIndex] = colorMap[0] * 255
+            imageData.data[redIndex + 1] = colorMap[1] * 255
+            imageData.data[redIndex + 2] = colorMap[2] * 255
+            imageData.data[redIndex + 3] = colorMap[3] * 255
+          }
         }
       }
 
